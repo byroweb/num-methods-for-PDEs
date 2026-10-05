@@ -118,6 +118,7 @@ def diffuse_kinks(p):
     I = p["f_vert"]*solar.ghi_clear(np.array(DIF_KNOTS, float))
     I[:2] = 0.0
     q = I*(p["SHGC_dif"]*p["A_glass_N"] + p["U_opq"]*p["A_opq_N"]*0.6/p["h_o"])
+    q = q*p.get("blind", 1.0)                     # fraction admitted (blinds closed ~ 0.3)
     return ramp_kinks(DIF_KNOTS, q)
 
 # ----------------------------------------------------------------------------------------
