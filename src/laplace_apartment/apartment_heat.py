@@ -45,7 +45,7 @@ WIND_10M = {"calm": 1.0, "forecast": 3.4, "breezy": 4.5}   # m/s  (forecast W 5-
 # ----------------------------------------------------------------------------------------
 # Building parameters (assumptions are flagged in the write-up)
 # ----------------------------------------------------------------------------------------
-def params(v10=WIND_10M["forecast"]):
+def params(v10=WIND_10M["forecast"], T_room0_F=70.0, east_glass_ft2=0.0):
     p = {}
     p["A_f"] = 30*25*FT**2                       # floor slab under unit, m^2
     p["d"], p["k"], p["rhoc"] = 0.20, 1.6, 2300*900.0   # 8" concrete
@@ -55,9 +55,10 @@ def params(v10=WIND_10M["forecast"]):
     p["h_g"] = (1.5 + 3.0*v_g) + 5.7              # convection + radiation to garage surfaces
     # room side of floor: still air + radiation to room surfaces, thin vinyl finish
     p["h_in"], p["R_fin"] = 7.5, 0.02
-    # envelope: north 30' x 12', east 25' x 12', 30 % glazing
+    # envelope: north 30' x 12', east 25' x 12'; two 9' x 4' north windows (only lit glass)
     A_wall_tot = (30 + 25)*12*FT**2
-    p["A_glass"] = 0.30*A_wall_tot
+    p["A_glass_N"] = 2*9*4*FT**2
+    p["A_glass"] = p["A_glass_N"] + east_glass_ft2*FT**2   # east glass (if any) sees no daylight
     p["A_opq"] = A_wall_tot - p["A_glass"]
     v_loc = 0.4*v10                               # N/E faces are leeward of a W wind
     p["h_o"] = 5.7 + 3.8*v_loc                    # McAdams-type exterior film
@@ -73,7 +74,13 @@ def params(v10=WIND_10M["forecast"]):
     p["C_a"] = 2.5e6
     # internal / diffuse gains
     p["Q_dogs"] = 100.0                           # two ~25 kg dogs, sensible part
-    p["SHGC"], p["I_v_peak"] = 0.55, 70.0         # diffuse on N/E vertical glass, W/m^2
+    p["SHGC_dif"] = 0.50                          # double glazing, hemispherical (diffuse) SHGC
+    p["f_vert"] = 0.12      # I_north ~ 0.5*DHI + 0.5*rho_g*GHI ~ (0.5*0.14 + 0.5*0.10)*GHI
+    # AC holds the room at T_room0 until 06:00 (steady state); garage/outdoor at T0
+    p["theta_a0"] = F2C*(T_room0_F - T0_F)
+    p["R_tot"] = 1/p["h_g"] + p["d"]/p["k"] + p["R_fin"] + 1/p["h_in"]
+    p["GQ0"] = 1/(p["A_f"]/p["R_tot"] + p["K_env"])   # G_Q(0), K per W
+    p["Q_pre"] = p["theta_a0"]/p["GQ0"]               # dogs + AC before 06:00 (negative = cooling)
     # route 2: courtyard slab
     p["alpha_s"] = 0.65
     p["t_sun_clock"] = 11.0                       # sun clears the building (assumed)
@@ -100,12 +107,15 @@ def ramp_kinks(knots_clock, values):
 
 T_OUT_KINKS = ramp_kinks([h for h, _ in FORECAST_F], [F2C*(f - T0_F) for _, f in FORECAST_F])
 
+DIF_KNOTS = [6.0, 6.85] + list(range(7, 16))
+
 def diffuse_kinks(p):
-    # 0 at 06:50 (sunrise) rising to plateau at 09:30
-    q = p["SHGC"]*p["A_glass"]*p["I_v_peak"]
-    # sol-air bump on opaque walls: alpha*I/h_o through U_opq
-    q += p["UA_opq"]*0.6*p["I_v_peak"]/p["h_o"]
-    return [((6 + 50/60 - 6)*HR, q/(2.67*HR)), ((9.5 - 6)*HR, -q/(2.67*HR))]
+    """Skylight on the north glass (+ small sol-air bump on opaque walls), following the
+    clear-sky curve hour by hour -> again a sum of shifted ramps."""
+    I = p["f_vert"]*solar.ghi_clear(np.array(DIF_KNOTS, float))
+    I[:2] = 0.0
+    q = I*(p["SHGC_dif"]*p["A_glass_N"] + p["UA_opq"]*0.6/p["h_o"])
+    return ramp_kinks(DIF_KNOTS, q)
 
 # ----------------------------------------------------------------------------------------
 # Transfer functions (functions of complex s, mpmath)
@@ -158,6 +168,15 @@ def shift_sum(base_t, base_f, kinks, t):
     f = interp1d(base_t, base_f, bounds_error=False, fill_value=(0.0, base_f[-1]))
     return sum(a*np.where(t > tk, f(t - tk), 0.0) for tk, a in kinks)
 
+def ac_off(p, unit_step, dc=None):
+    """Initial condition by superposition.  Before 06:00 the heat input to the room is the
+    constant Q_pre = dogs + AC, which holds the whole slab/room system in steady state at
+    theta_a0.  At t=0 the AC stops, i.e. Q jumps from Q_pre to Q_dogs:
+        Theta = G(0) Q_pre / s  +  (Q_dogs - Q_pre) G(s)/s
+    No initial temperature profile in the slab is ever needed."""
+    dc = p["GQ0"] if dc is None else dc
+    return dc*p["Q_pre"] + (p["Q_dogs"] - p["Q_pre"])*unit_step
+
 def solve_laplace(p, t, L_court=0.0):
     tb = np.linspace(0, t[-1], 181)
     # unit-ramp responses (1/s^2) and unit-step responses (1/s)
@@ -188,9 +207,9 @@ def solve_laplace(p, t, L_court=0.0):
     dk = diffuse_kinks(p)
     Th_o = shift_sum(tb, tb, T_OUT_KINKS, t)
     Th_a = (shift_sum(tb, r_o, T_OUT_KINKS, t) + shift_sum(tb, r_Q, dk, t)
-            + p["Q_dogs"]*np.interp(t, tb, u_Q) + np.interp(t, tb, resp_c))
+            + ac_off(p, np.interp(t, tb, u_Q)) + np.interp(t, tb, resp_c))
     q_floor = (shift_sum(tb, fr_o, T_OUT_KINKS, t) + shift_sum(tb, fr_Q, dk, t)
-               + p["Q_dogs"]*np.interp(t, tb, fu_Q))
+               + ac_off(p, np.interp(t, tb, fu_Q), dc=-p["GQ0"]/p["R_tot"]))
     Q_dif = shift_sum(tb, tb, dk, t)
     Th_a_dif = shift_sum(tb, r_Q, dk, t)                      # superposition pieces
     Th_a_court = np.interp(t, tb, resp_c)
@@ -257,7 +276,10 @@ def fd_solve(p_of_t, t_end, N=40):
         dTa = (p["A_f"]*q_top + p["K_env"]*(To(t) - Ta) + Q)/p["C_a"]
         return np.concatenate([dT, [dTa]])
     t = np.linspace(0, t_end, 361)
-    sol = solve_ivp(rhs, (0, t_end), np.zeros(N + 1), t_eval=t, method="BDF", max_step=300)
+    q0 = -p0["theta_a0"]/p0["R_tot"]                   # steady upward flux with AC on
+    z = (np.arange(N) + 0.5)*dz
+    y0 = np.concatenate([-q0*(1/p0["h_g"] + z/p0["k"]), [p0["theta_a0"]]])
+    sol = solve_ivp(rhs, (0, t_end), y0, t_eval=t, method="BDF", max_step=300)
     return sol.t, sol.y[N], sol.y[N - 1]
 
 def wind_profile(t):
@@ -285,7 +307,7 @@ if __name__ == "__main__":
         "3 glazing conduction": p["UA_glass"]*(To - Ta),
         "3 opaque walls": p["UA_opq"]*(To - Ta),
         "3 infiltration (wind)": p["UA_inf"]*(To - Ta),
-        "3b diffuse daylight": r["Q_dif"],
+        "3b skylight (north glass + wall sol-air)": r["Q_dif"],
         "dogs": p["Q_dogs"]*np.ones_like(t),
         "2 courtyard slab (flush, upper bound)": r["Q_court"],
     }
@@ -302,15 +324,14 @@ if __name__ == "__main__":
     lump = lumped_symbolic(p)
     Ta_lump = (shift_sum(t, lump["o"]["ramp"](t), T_OUT_KINKS, t)
                + shift_sum(t, lump["Q"]["ramp"](t), diffuse_kinks(p), t)
-               + p["Q_dogs"]*lump["Q"]["step"](t))
+               + lump["Q"]["G0"]*(p["theta_a0"]/lump["Q"]["G0"])
+               + (p["Q_dogs"] - p["theta_a0"]/lump["Q"]["G0"])*lump["Q"]["step"](t))
     # FD checks
     tfd, Ta_fd, _ = fd_solve(lambda tt: params(), 9*HR)
     tfd2, Ta_fd_wind, _ = fd_solve(lambda tt: params(float(wind_profile(tt))), 9*HR)
 
-    # initial-condition response: room 3 F warmer than outdoors at 06:00, slab at T0
-    # L{C dT/dt} = C(s Th - th0)  ->  extra term C_a th0 * G_Q(s)
-    th0 = F2C*3
-    ic = invert(lambda s: p["C_a"]*th0*G_room(p, s)[1], t)
+    r_noac = solve_laplace(params(T_room0_F=T0_F), t)           # no AC overnight
+    r_east = solve_laplace(params(east_glass_ft2=36.0), t)      # one unlit 9'x4' east window
 
     def F(x):
         return T0_F + c2f(x)
@@ -336,7 +357,8 @@ if __name__ == "__main__":
     for name, ls in [("calm", ":"), ("forecast", "-"), ("breezy", "--")]:
         ax.plot(clock, F(res[name]["Th_a"]), color="#1d4ed8", ls=ls, lw=1.6,
                 label=f"Wind {name}: {WIND_10M[name]:.1f} m/s")
-    ax.plot(clock, F(Ta + ic), color="#c2410c", lw=1.4, label="Forecast wind, room starts 3 °F warmer")
+    ax.plot(clock, F(r_noac["Th_a"]), color="#c2410c", lw=1.4, label="No AC overnight (room and slab start at 77 °F)")
+    ax.plot(clock, F(r_east["Th_a"]), color="#64748b", lw=1.4, label="Plus one 9'x4' east window (no daylight)")
     ax.set_xlabel("Clock time (PDT)"); ax.set_ylabel("Room air, °F")
     ax.set_xticks(range(6, 16)); ax.grid(alpha=0.25); ax.legend(fontsize=8, frameon=False)
     fig.tight_layout(); fig.savefig("fig_sensitivity.png", dpi=150)
@@ -348,7 +370,7 @@ if __name__ == "__main__":
     ax.axhline(0, color="k", lw=0.6)
     ax.set_xlabel("Clock time (PDT)"); ax.set_ylabel("Heat into the unit, W")
     ax.set_xticks(range(6, 16)); ax.grid(alpha=0.25)
-    ax.legend(fontsize=8, frameon=False, loc="upper left")
+    ax.legend(fontsize=8, frameon=False, loc="lower left")
     fig.tight_layout(); fig.savefig("fig_routes.png", dpi=150)
 
     fig, ax = plt.subplots(figsize=(8, 4.0))
@@ -374,7 +396,8 @@ if __name__ == "__main__":
         hourly={h: dict(T_out=F(To[i]), T_air=F(Ta[i]), T_air_calm=F(res["calm"]["Th_a"][i]),
                         T_air_breezy=F(res["breezy"]["Th_a"][i]), T_2ft=F(T_2ft[i]),
                         T_floor=F(T_floor[i]), T_air_fd=F(Ta_fd[i]), T_air_fd_wind=F(Ta_fd_wind[i]),
-                        T_air_ic=F(Ta[i] + ic[i]), T_air_blinds=F(Ta_bl[i]),
+                        T_air_noac=F(r_noac["Th_a"][i]), T_air_east=F(r_east["Th_a"][i]),
+                        T_air_blinds=F(Ta_bl[i]),
                         T_floor_blinds=F(T_floor_bl[i]), T_air_nocourt=F(Ta[i] - r["Th_a_court"][i]),
                         T_air_lump=F(Ta_lump[i]),
                         **{k: float(v[i]) for k, v in routes.items()},
