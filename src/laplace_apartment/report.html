@@ -1,0 +1,215 @@
+<title>Corner Unit Heat-Up</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,650&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js"></script>
+<style>
+/* Layout: single reading column (calc-sheet), wide plates for figures and tables. */
+:root {
+  --paper: #f5f7f8;
+  --ink: #18212b;
+  --muted: #5a6672;
+  --rule: #d6dde3;
+  --concrete: #0e6a74;
+  --heat: #b8400f;
+  --plate: #ffffff;
+  --tint: #e8eff1;
+  --f-display: "Literata", Georgia, serif;
+  --f-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #11171c; --ink: #e3e9ee; --muted: #9aa7b2; --rule: #2b3640;
+  --concrete: #5cc3cd; --heat: #f08a5d; --plate: #f4f6f7; --tint: #1a242c; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #11171c; --ink: #e3e9ee; --muted: #9aa7b2; --rule: #2b3640;
+  --concrete: #5cc3cd; --heat: #f08a5d; --plate: #f4f6f7; --tint: #1a242c; color-scheme: dark }
+
+body { background: var(--paper); color: var(--ink); font: 400 17px/1.6 var(--f-body); }
+.wrap { max-width: 46rem; margin: 0 auto; padding-inline: 18px; padding-block: 40px 72px; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 650; line-height: 1.2; text-wrap: balance; }
+h1 { font-size: 2.1rem; margin: 0.2rem 0 0.6rem; }
+h2 { font-size: 1.45rem; margin: 2.8rem 0 0.6rem; padding-top: 1.2rem; border-top: 1px solid var(--rule); }
+h3 { font-size: 1.1rem; margin: 1.8rem 0 0.4rem; }
+p, li { max-width: 65ch; }
+.eyebrow { font: 500 0.78rem/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--concrete); }
+.lede { color: var(--muted); font-size: 1.06rem; }
+code, .mono { font-family: var(--f-mono); font-size: 0.88em; }
+a { color: var(--concrete); }
+.verdict { background: var(--tint); border-left: 3px solid var(--heat); padding: 14px 18px; margin: 1.6rem 0; }
+.verdict p { margin: 0.3rem 0; }
+.readings { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 12px; margin: 1.4rem 0; }
+.reading { border-top: 2px solid var(--ink); padding-top: 6px; min-width: 0; }
+.reading .v { font: 500 1.6rem/1.1 var(--f-mono); font-variant-numeric: tabular-nums; }
+.reading .v.hot { color: var(--heat); }
+.reading .k { font-size: 0.86rem; color: var(--muted); }
+figure { margin: 1.6rem 0; }
+figure img { display: block; width: 100%; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; }
+figcaption { font-size: 0.9rem; color: var(--muted); margin-top: 6px; }
+.math { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+.scroll { overflow-x: auto; margin: 1.2rem 0; }
+table { border-collapse: collapse; font-size: 0.92rem; font-variant-numeric: tabular-nums; min-width: 34rem; width: 100%; }
+th, td { padding: 6px 10px; border-bottom: 1px solid var(--rule); text-align: right; }
+th { font-weight: 600; color: var(--muted); font-size: 0.82rem; }
+td:first-child, th:first-child { text-align: left; }
+td.hot { color: var(--heat); font-weight: 600; }
+tr.sum td { font-weight: 600; border-top: 1.5px solid var(--ink); }
+.small { font-size: 0.9rem; color: var(--muted); }
+ol.steps { padding-left: 1.2rem; }
+ol.steps li { margin-bottom: 0.4rem; }
+</style>
+
+<div class="wrap">
+<div class="eyebrow">San Diego · Mon 5 Oct 2026 · 06:00–15:00 PDT</div>
+<h1>Corner Unit Heat-Up</h1>
+<p class="lede">A second-floor, northeast-corner apartment with no direct sun and two dogs inside. I model the floor slab, a sunlit courtyard slab, and the north and east walls as a linear heat network, solve it in the Laplace domain, and check the result with finite differences.</p>
+
+<div class="verdict">
+<p><strong>By 3 pm the room air reaches about 88 °F (about 87 °F at dog height) while it is 99 °F outside.</strong> The floor stays cooler, near 84 °F.</p>
+<p>With blinds or curtains closed, those numbers drop to about 85 °F air and 83 °F floor. The 8-inch slab is the reason the room lags so far behind the outdoors. It soaks up heat from the room all day, and the garage heat moving up through it mostly arrives tonight.</p>
+</div>
+
+<div class="readings">
+  <div class="reading"><div class="v hot">99 °F</div><div class="k">Outdoor and garage air, 3 pm</div></div>
+  <div class="reading"><div class="v">87.7 °F</div><div class="k">Room air, mixed mean</div></div>
+  <div class="reading"><div class="v">86.6 °F</div><div class="k">Air at 2 ft (estimate)</div></div>
+  <div class="reading"><div class="v">84.1 °F</div><div class="k">Floor surface</div></div>
+</div>
+
+<h2>The forecast used</h2>
+<p>I could not reach the National Weather Service or Open-Meteo data feeds from this environment, so I took the published hourly forecast from web search results. That forecast shows an <strong>Extreme Heat Warning from 5 to 8 October</strong>, clear skies, a high of 99 °F, and wind from the west at 5–10 mph, light and variable in the early morning.</p>
+<div class="scroll"><table>
+<tr><th>Clock</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th></tr>
+<tr><td>Air, °F</td><td>77*</td><td>79</td><td>80</td><td>82</td><td>88</td><td>97</td><td>98</td><td>98</td><td>99*</td><td>99*</td></tr>
+<tr><td>Sun altitude, °</td><td>−11</td><td>2</td><td>14</td><td>26</td><td>37</td><td>45</td><td>51</td><td>51</td><td>47</td><td>39</td></tr>
+</table></div>
+<p class="small">* Interpolated from the forecast's daily high and the overnight trend. Sun altitude is computed for 32.72° N on day 278: declination −5.8°, sunrise about 6:50, solar noon 12:36 PDT. The garage air is taken equal to this outdoor air, as specified.</p>
+
+<h2>Why Laplace fits this problem</h2>
+<p>Every piece of the problem is linear with constant coefficients once the film coefficients are fixed. Every input is a ramp, a step, or a sum of shifted ramps and steps. That gives the Laplace method three tools that do almost all of the work:</p>
+<ol class="steps">
+<li><strong>The derivative becomes multiplication.</strong> The slab's heat equation, a PDE in depth and time, turns into an ODE in depth with \(s\) as a parameter, and that ODE has an exact solution.</li>
+<li><strong>Delays become exponentials.</strong> A temperature kink at time \(t_k\), or the sun clearing the roofline at \(t_s\), is a factor \(e^{-t_k s}\). The second shift theorem undoes it.</li>
+<li><strong>Superposition.</strong> Each route is its own transfer function, so each route's share of the answer can be read off separately.</li>
+</ol>
+
+<h3>1 · Room-air node</h3>
+<p>Write every temperature as a deviation \(\theta\) from 77 °F, the 06:00 state. The room, its furnishings and drywall form one node with effective capacitance \(C_a\). The balance on that node is</p>
+<div class="math">\[ C_a\,\dot\theta_a = A_f\,q_f(t) + K\,[\theta_o(t)-\theta_a] + Q(t),\qquad K = UA_{\text{glass}}+UA_{\text{wall}}+UA_{\text{infil}} \]</div>
+<p>Here \(q_f\) is the heat flux up through the floor and \(Q\) collects the dogs, diffuse daylight, and the courtyard term. Because everything starts at the same temperature, the transform is just \(C_a s\,\Theta_a\). The section on initial conditions below covers a room that starts warmer.</p>
+
+<h3>2 · Route 1: the floor slab as an exact two-port</h3>
+<p>Inside the slab, \(\partial_t\theta=\alpha\,\partial_{zz}\theta\). Transforming in time gives \(\Theta''=(s/\alpha)\Theta\), whose solutions are \(\cosh\) and \(\sinh\) of \(\gamma z\) with \(\gamma=\sqrt{s/\alpha}\). Tracking the temperature and the flux \(\Phi=-k\Theta'\) at both faces turns the slab into a 2×2 transfer matrix. This is the thermal-quadrupole method. Each air film is a series resistance, and the layers multiply:</p>
+<div class="math">\[ \begin{bmatrix}\Theta_o\\ \Phi\end{bmatrix}_{\text{garage}} = \underbrace{\begin{bmatrix}1&\tfrac1{h_g}\\0&1\end{bmatrix}}_{\text{garage film}} \underbrace{\begin{bmatrix}\cosh\gamma d & \dfrac{\sinh\gamma d}{k\gamma}\\[4pt] k\gamma\sinh\gamma d & \cosh\gamma d\end{bmatrix}}_{\text{8 in concrete}} \underbrace{\begin{bmatrix}1&R_{\text{fin}}+\tfrac1{h_{in}}\\0&1\end{bmatrix}}_{\text{floor finish + room film}} \begin{bmatrix}\Theta_a\\ \Phi_a\end{bmatrix} \equiv \begin{bmatrix}\mathcal A&\mathcal B\\ \mathcal C&\mathcal D\end{bmatrix}\begin{bmatrix}\Theta_a\\ \Phi_a\end{bmatrix} \]</div>
+<p>The top row gives the floor flux into the room directly, \(\Phi_a=(\Theta_o-\mathcal A\,\Theta_a)/\mathcal B\). Substituting it into the room balance gives two exact transfer functions:</p>
+<div class="math">\[ \Theta_a(s) = \underbrace{\frac{A_f/\mathcal B + K}{C_a s + A_f\mathcal A/\mathcal B + K}}_{G_o(s)}\,\Theta_o(s) \;+\; \underbrace{\frac{1}{C_a s + A_f\mathcal A/\mathcal B + K}}_{G_Q(s)}\,Q(s) \]</div>
+<p>As a check, when \(s\to0\) we get \(\mathcal A\to1\) and \(\mathcal B\to R_{\text{total}}\), so \(G_o(0)=1\). Given enough time, the room reaches the outdoor temperature.</p>
+
+<h3>3 · The inputs as shifted ramps and steps</h3>
+<p>The forecast is piecewise linear, so it is a sum of ramps that switch on at each hourly kink, where \(\Delta m_k\) is the change in slope at \(t_k\):</p>
+<div class="math">\[ \theta_o(t)=\sum_k \Delta m_k\,(t-t_k)\,H(t-t_k) \;\;\Longrightarrow\;\; \Theta_o(s)=\sum_k \Delta m_k\,\frac{e^{-t_k s}}{s^2} \]</div>
+<p>The other inputs follow the same pattern. The dogs are a step, \(Q_d/s\). Diffuse daylight ramps up from sunrise to 9:30 and then holds. The courtyard sun is a delayed step, \(q_\odot\,e^{-t_s s}/s\).</p>
+
+<h3>4 · Inversion with the second shift theorem</h3>
+<p>I invert only the undelayed unit responses once, for example \(r(t)=\mathcal L^{-1}\{G_o(s)/s^2\}\). Then the answer is assembled by shifting:</p>
+<div class="math">\[ \theta_a(t)=\sum_k \Delta m_k\, r(t-t_k)\,H(t-t_k) \;+\; Q_d\,u_Q(t) \;+\;\cdots,\qquad \mathcal L^{-1}\{e^{-as}F(s)\}=f(t-a)H(t-a) \]</div>
+<p>\(G_o\) contains \(\cosh\sqrt{s}\), so it has infinitely many poles and is easier to invert numerically. I use Talbot's contour method from <code>mpmath</code>. It is accurate to many digits for functions like this, as long as no \(e^{-as}\) factor is left inside the integral. Pulling the delays out first, as above, is what makes that work.</p>
+
+<h3>5 · A lumped version, inverted by hand</h3>
+<p>If the slab is collapsed into a single node \(C_s\), splitting its resistance half to each face, \(G(s)\) becomes a rational function with two real poles. Every response is then a short sum of residues:</p>
+<div class="math">\[ \mathcal L^{-1}\!\Big\{\tfrac{G(s)}{s^2}\Big\} = G(0)\,t + G'(0) + \sum_{i=1}^{2}\frac{r_i}{p_i^2}e^{p_i t},\qquad r_i = \frac{N(p_i)}{D'(p_i)} \]</div>
+<p>The poles give the system's two time constants. <strong>τ₁ ≈ 1.6 h</strong> is the room trading heat with the slab. <strong>τ₂ ≈ 16.7 h</strong> is the whole slab-and-room system following the outdoors. The second one is why the room lags so much. The lumped model reads about 1.5 °F high by 3 pm, though. With Biot number ≈ 1.3 and Fourier number &lt; 1 over the day, an 8-inch slab is not thermally thin, and the exact two-port matters.</p>
+
+<h3>6 · Route 2: sun on the courtyard slab, lateral conduction</h3>
+<p>Treat the podium slab as a fin along the horizontal coordinate \(x\). This lumps it through its thickness, which overstates how fast heat spreads sideways, so the result is an upper bound. The sunlit courtyard is \(x&lt;0\) and the shaded interior is \(x&gt;0\). Transforming in time gives</p>
+<div class="math">\[ \Theta''-m_i^2\Theta = -\frac{q_\odot\,e^{-t_s s}}{s\,kd}\ \ (x&lt;0),\qquad m_i^2=\frac{s}{\alpha}+\frac{H_i}{kd} \]</div>
+<p>Here \(H_i\) is the total surface conductance per unit area of slab in each region. Matching temperature and flux at \(x=0\), the flux reaching the unit's edge a distance \(L\) away is</p>
+<div class="math">\[ q'(s)=\frac{q_\odot\,e^{-t_s s}}{s}\;\frac{m_2\,e^{-m_2 L}}{m_1(m_1+m_2)} \;\;\xrightarrow{\ H\to0,\ L=0\ }\;\; q'(t)=q_\odot\sqrt{\alpha\,(t-t_s)/\pi} \]</div>
+<p>The heat only penetrates a distance on the order of \(\sqrt{\alpha t}\approx\) 0.1–0.15 m into concrete over a working day. With the sun clearing the building at an assumed 11:00 and 414 W/m² absorbed, a courtyard that shares a 15 ft edge directly with your slab delivers at most <strong>about 85 W by 3 pm</strong>. If even one neighboring unit's floor sits between the courtyard and yours (L = 25 ft), the factor \(e^{-m_2 L}\approx e^{-90}\), and the courtyard contributes <strong>zero</strong> today. Since you describe the courtyard as southwest of the unit, with units to the west and south, the second case is the likely one.</p>
+
+<h3>7 · Route 3: walls, glass and wind</h3>
+<p>The insulated walls carry little mass, so I treat them as pure conductances. Wind enters in three places, each through a constant coefficient:</p>
+<ul>
+<li>the exterior film \(h_o=5.7+3.8\,v_{\text{loc}}\), with \(v_{\text{loc}}=0.4\,v_{10}\) because north and east faces are leeward of a west wind;</li>
+<li>the garage-side film \(h_g\), with garage air moving at 30% of the 10 m wind;</li>
+<li>infiltration, \(\text{ACH}=0.20+0.05\,v_{10}\).</li>
+</ul>
+<p>At the forecast 3.4 m/s this gives \(K\) = 44.6 (glass) + 17.2 (walls) + 31.1 (infiltration) = <strong>92.9 W/K</strong>. Glass and air leakage dominate. The R-13 walls are minor.</p>
+<p>I added one more gain the original list leaves out, labeled <strong>3b</strong>. The unit gets no direct sun, but the north and east windows still see the sky. At about 70 W/m² of diffuse light on vertical glass and a solar heat-gain coefficient of 0.55, roughly 770 W comes through the glazing. Over the day that is the largest single gain. Closing the blinds is the main thing you control.</p>
+
+<h3>8 · Initial conditions</h3>
+<p>If the room starts warmer than the outdoors, the derivative transforms to \(C_a(s\Theta_a-\theta_0)\). That adds one extra term, \(C_a\theta_0\,G_Q(s)\), with no other change. A room that starts 3 °F warm loses most of that excess through the fast 1.6 h mode into the slab and ends only 0.2 °F warmer at 3 pm. A slab that is already warm from earlier hot days would matter more, because it removes the floor's sink effect. That is the biggest uncertainty here.</p>
+
+<h2>Results</h2>
+<figure>
+<img src="fig_temperatures.png" alt="Outdoor air rises from 77 to 99 °F, with a sharp jump between 9 and 11 am. Room air rises steadily from 77 to 87.7 °F at 3 pm, air at 2 ft runs about 1 °F lower, and the floor surface reaches 84 °F. The blinds-closed curves run about 2 °F lower.">
+<figcaption>Temperatures, forecast wind. Dashed lines show blinds or curtains closed, letting in 30% of the diffuse daylight. The 2 ft line assumes a gentle 0.5 K/m stable gradient: heat enters high through the windows while the floor lags.</figcaption>
+</figure>
+
+<figure>
+<img src="fig_routes.png" alt="Heat flow by route over time. Diffuse daylight ramps to about 770 W by 9:30. Glazing, infiltration and walls peak around 11 am at 365, 255 and 140 W. The dogs are a flat 100 W. The floor slab is negative, falling to about −1,090 W around 1 pm. The courtyard term starts at 11 and rises to about 85 W.">
+<figcaption>Heat flow into the room by route. A negative value means heat leaving the room. The floor is the only large sink.</figcaption>
+</figure>
+
+<div class="scroll"><table>
+<tr><th>Route</th><th>Model</th><th>3 pm, W</th><th>6 am–3 pm, kWh</th></tr>
+<tr><td>1 · Floor slab, garage below</td><td>exact two-port</td><td>−1,045</td><td>−6.0</td></tr>
+<tr><td>2 · Courtyard slab, edge flush</td><td>Laplace fin, upper bound</td><td>+87</td><td>+0.26</td></tr>
+<tr><td>2 · Courtyard slab, one unit away</td><td>same</td><td>0</td><td>0</td></tr>
+<tr><td>3 · Double glazing, conduction</td><td>UA = 44.6 W/K</td><td>+280</td><td>+1.8</td></tr>
+<tr><td>3 · Opaque N/E walls</td><td>UA = 17.2 W/K</td><td>+108</td><td>+0.7</td></tr>
+<tr><td>3 · Infiltration (wind)</td><td>0.37 ACH</td><td>+195</td><td>+1.3</td></tr>
+<tr><td>3b · Diffuse daylight through glass</td><td>ramp, then step</td><td>+774</td><td>+5.3</td></tr>
+<tr><td>Dogs</td><td>step</td><td>+100</td><td>+0.9</td></tr>
+<tr class="sum"><td>Net stored in room air and furnishings</td><td></td><td></td><td>≈ +4.3</td></tr>
+</table></div>
+<p>The table shows what is going on in the floor. The garage pushes heat into the underside of the slab all day, but the diffusion time through 8 inches, \(d^2/\alpha\approx14\) h, means very little of it reaches the top surface by 3 pm. Meanwhile the slab's top half absorbs heat from the warming room. The slab's heat capacity is about 29 MJ/K, more than 11 times the room's. By evening the slab turns into a heat source and keeps the unit warm overnight.</p>
+
+<h3>Hour by hour</h3>
+<div class="scroll"><table>
+<tr><th>Clock</th><th>Outdoor</th><th>Room air</th><th>Air at 2 ft</th><th>Floor</th><th>Air, blinds closed</th><th>Floor, blinds closed</th></tr>
+<tr><td>6:00</td><td>77</td><td>77.0</td><td>75.9</td><td>77.0</td><td>77.0</td><td>77.0</td></tr>
+<tr><td>7:00</td><td>79</td><td>77.3</td><td>76.2</td><td>77.1</td><td>77.3</td><td>77.1</td></tr>
+<tr><td>8:00</td><td>80</td><td>78.0</td><td>76.9</td><td>77.3</td><td>77.7</td><td>77.2</td></tr>
+<tr><td>9:00</td><td>82</td><td>79.1</td><td>78.0</td><td>77.7</td><td>78.3</td><td>77.5</td></tr>
+<tr><td>10:00</td><td>88</td><td>80.6</td><td>79.5</td><td>78.3</td><td>79.2</td><td>77.9</td></tr>
+<tr><td>11:00</td><td class="hot">97</td><td>82.3</td><td>81.2</td><td>79.1</td><td>80.5</td><td>78.5</td></tr>
+<tr><td>12:00</td><td class="hot">98</td><td>83.9</td><td>82.8</td><td>80.3</td><td>81.9</td><td>79.5</td></tr>
+<tr><td>13:00</td><td class="hot">98</td><td>85.3</td><td>84.2</td><td>81.5</td><td>83.1</td><td>80.6</td></tr>
+<tr><td>14:00</td><td class="hot">99</td><td>86.5</td><td>85.4</td><td>82.8</td><td>84.2</td><td>81.9</td></tr>
+<tr><td>15:00</td><td class="hot">99</td><td>87.7</td><td>86.6</td><td>84.1</td><td>85.3</td><td>83.0</td></tr>
+</table></div>
+<p class="small">All values in °F. At 6:00 the 2 ft value sits below the mean only because of the assumed constant gradient. Treat it as an estimate within ±1 °F.</p>
+
+<h3>Wind and starting-state sensitivity</h3>
+<figure>
+<img src="fig_sensitivity.png" alt="Room air under calm, forecast and breezy wind differs by less than 1 °F at 3 pm. Starting 3 °F warmer adds only about 0.2 °F by 3 pm.">
+<figcaption>Calm wind (1 m/s) gives 87.1 °F at 3 pm and breezy (4.5 m/s) gives 88.0 °F. More wind means more infiltration of hot air and a stronger glass film, so wind slightly <em>warms</em> the unit on a day when outdoor air is hotter than indoor air.</figcaption>
+</figure>
+
+<h2>Verification</h2>
+<figure>
+<img src="fig_verification.png" alt="Four room-air curves. The Laplace and finite-difference results overlap. The lumped two-node model runs about 1.5 °F higher by 3 pm. The time-varying wind finite-difference run sits within 0.1 °F of the constant-wind result.">
+<figcaption>The Talbot-inverted Laplace solution and a 40-cell finite-difference slab (method of lines, BDF) agree to 0.05 °F at every hour. The finite-difference run with time-varying wind breaks the constant-coefficient assumption that Laplace needs, yet it moves the answer by less than 0.1 °F. Holding the wind constant was a safe simplification.</figcaption>
+</figure>
+
+<h2>Assumptions to check</h2>
+<p>Each of these is a parameter in <code>apartment_heat.py</code> and can be changed with one edit. They are listed roughly in order of how much they move the 3 pm answer.</p>
+<div class="scroll"><table>
+<tr><th>Item</th><th>Value used</th><th>Effect if wrong</th></tr>
+<tr><td>Starting state at 6:00</td><td>room and slab at 77 °F</td><td>A pre-warmed slab weakens the floor sink. This is the largest effect.</td></tr>
+<tr><td>Diffuse light on N/E glass</td><td>70 W/m², SHGC 0.55</td><td>Blinds closed gives −2.4 °F at 3 pm.</td></tr>
+<tr><td>Glazing fraction, frame</td><td>30% of the walls, U ≈ 2.4 W/m²K</td><td>Scales both conduction and daylight gain.</td></tr>
+<tr><td>Slab</td><td>8 in concrete, k = 1.6, thin vinyl finish</td><td>Carpet would insulate the room from the slab sink and make it warmer.</td></tr>
+<tr><td>Room capacitance \(C_a\)</td><td>2.5 MJ/K (air, drywall, furniture)</td><td>Mainly changes the fast mode.</td></tr>
+<tr><td>Garage film \(h_g\)</td><td>10.3 W/m²K (convection + radiation)</td><td>Small effect, because slab diffusion is the bottleneck.</td></tr>
+<tr><td>Dogs</td><td>100 W sensible for two ~25 kg dogs</td><td>±50 W gives about ±0.3 °F.</td></tr>
+<tr><td>Sun clears courtyard roofline</td><td>11:00, step</td><td>Irrelevant unless the courtyard slab touches yours.</td></tr>
+</table></div>
+
+<h2>Code</h2>
+<p>The model is in <code>src/laplace_apartment/</code> of your <span class="mono">num-methods-for-PDEs</span> working copy. <code>apartment_heat.py</code> holds the transfer functions, Talbot inversion, residue model, finite differences and figures. <code>solar.py</code> handles sun position and clear-sky irradiance. Run <code>python3 apartment_heat.py</code>, which takes about 2 minutes.</p>
+<p class="small">Forecast sources: <a href="https://www.wunderground.com/hourly/us/ca/ocean-beach/92107">Weather Underground hourly</a>, <a href="https://www.accuweather.com/en/us/san-diego/92101/hourly-weather-forecast/347628">AccuWeather hourly</a>, <a href="https://www.weatherbug.com/weather-forecast/hourly/san-diego-ca-92123?day=today">WeatherBug hourly</a>, <a href="https://forecast.weather.gov/MapClick.php?lat=32.718814&amp;lon=-117.162222">NWS point forecast</a>, retrieved through web search on 5 Oct 2026.</p>
+</div>
