@@ -45,7 +45,7 @@ WIND_10M = {"calm": 1.0, "forecast": 3.4, "breezy": 4.5}   # m/s  (forecast W 5-
 # ----------------------------------------------------------------------------------------
 # Building parameters (assumptions are flagged in the write-up)
 # ----------------------------------------------------------------------------------------
-def params(v10=WIND_10M["forecast"], T_room0_F=70.0, east_glass_ft2=0.0):
+def params(v10=WIND_10M["forecast"], T_room0_F=70.0, east_glass_ft2=72.0):
     p = {}
     p["A_f"] = 30*25*FT**2                       # floor slab under unit, m^2
     p["d"], p["k"], p["rhoc"] = 0.20, 1.6, 2300*900.0   # 8" concrete
@@ -58,8 +58,11 @@ def params(v10=WIND_10M["forecast"], T_room0_F=70.0, east_glass_ft2=0.0):
     # envelope: north 30' x 12', east 25' x 12'; two 9' x 4' north windows (only lit glass)
     A_wall_tot = (30 + 25)*12*FT**2
     p["A_glass_N"] = 2*9*4*FT**2
-    p["A_glass"] = p["A_glass_N"] + east_glass_ft2*FT**2   # east glass (if any) sees no daylight
+    # east windows look only at the unlit wall of the building next door: conduction, no daylight
+    p["A_glass_E"] = east_glass_ft2*FT**2          # assumed two 9' x 4', like the north side
+    p["A_glass"] = p["A_glass_N"] + p["A_glass_E"]
     p["A_opq"] = A_wall_tot - p["A_glass"]
+    p["A_opq_N"] = 30*12*FT**2 - p["A_glass_N"]    # only the north wall sees sky
     v_loc = 0.4*v10                               # N/E faces are leeward of a W wind
     p["h_o"] = 5.7 + 3.8*v_loc                    # McAdams-type exterior film
     p["U_opq"] = 1/(13*0.176 + 0.12 + 1/p["h_o"])   # R-13 effective framed wall
@@ -110,11 +113,11 @@ T_OUT_KINKS = ramp_kinks([h for h, _ in FORECAST_F], [F2C*(f - T0_F) for _, f in
 DIF_KNOTS = [6.0, 6.85] + list(range(7, 16))
 
 def diffuse_kinks(p):
-    """Skylight on the north glass (+ small sol-air bump on opaque walls), following the
+    """Skylight on the north glass (+ small sol-air bump on the north wall), following the
     clear-sky curve hour by hour -> again a sum of shifted ramps."""
     I = p["f_vert"]*solar.ghi_clear(np.array(DIF_KNOTS, float))
     I[:2] = 0.0
-    q = I*(p["SHGC_dif"]*p["A_glass_N"] + p["UA_opq"]*0.6/p["h_o"])
+    q = I*(p["SHGC_dif"]*p["A_glass_N"] + p["U_opq"]*p["A_opq_N"]*0.6/p["h_o"])
     return ramp_kinks(DIF_KNOTS, q)
 
 # ----------------------------------------------------------------------------------------
@@ -307,7 +310,7 @@ if __name__ == "__main__":
         "3 glazing conduction": p["UA_glass"]*(To - Ta),
         "3 opaque walls": p["UA_opq"]*(To - Ta),
         "3 infiltration (wind)": p["UA_inf"]*(To - Ta),
-        "3b skylight (north glass + wall sol-air)": r["Q_dif"],
+        "3b skylight (north glass + north wall sol-air)": r["Q_dif"],
         "dogs": p["Q_dogs"]*np.ones_like(t),
         "2 courtyard slab (flush, upper bound)": r["Q_court"],
     }
@@ -331,7 +334,8 @@ if __name__ == "__main__":
     tfd2, Ta_fd_wind, _ = fd_solve(lambda tt: params(float(wind_profile(tt))), 9*HR)
 
     r_noac = solve_laplace(params(T_room0_F=T0_F), t)           # no AC overnight
-    r_east = solve_laplace(params(east_glass_ft2=36.0), t)      # one unlit 9'x4' east window
+    r_east0 = solve_laplace(params(east_glass_ft2=0.0), t)      # no east glass
+    r_east = solve_laplace(params(east_glass_ft2=144.0), t)     # four unlit 9'x4' east windows
 
     def F(x):
         return T0_F + c2f(x)
@@ -358,7 +362,8 @@ if __name__ == "__main__":
         ax.plot(clock, F(res[name]["Th_a"]), color="#1d4ed8", ls=ls, lw=1.6,
                 label=f"Wind {name}: {WIND_10M[name]:.1f} m/s")
     ax.plot(clock, F(r_noac["Th_a"]), color="#c2410c", lw=1.4, label="No AC overnight (room and slab start at 77 °F)")
-    ax.plot(clock, F(r_east["Th_a"]), color="#64748b", lw=1.4, label="Plus one 9'x4' east window (no daylight)")
+    ax.plot(clock, F(r_east0["Th_a"]), color="#64748b", lw=1.2, ls=":", label="No east glass")
+    ax.plot(clock, F(r_east["Th_a"]), color="#64748b", lw=1.4, label="East glass doubled (144 ft², unlit)")
     ax.set_xlabel("Clock time (PDT)"); ax.set_ylabel("Room air, °F")
     ax.set_xticks(range(6, 16)); ax.grid(alpha=0.25); ax.legend(fontsize=8, frameon=False)
     fig.tight_layout(); fig.savefig("fig_sensitivity.png", dpi=150)
@@ -396,7 +401,7 @@ if __name__ == "__main__":
         hourly={h: dict(T_out=F(To[i]), T_air=F(Ta[i]), T_air_calm=F(res["calm"]["Th_a"][i]),
                         T_air_breezy=F(res["breezy"]["Th_a"][i]), T_2ft=F(T_2ft[i]),
                         T_floor=F(T_floor[i]), T_air_fd=F(Ta_fd[i]), T_air_fd_wind=F(Ta_fd_wind[i]),
-                        T_air_noac=F(r_noac["Th_a"][i]), T_air_east=F(r_east["Th_a"][i]),
+                        T_air_noac=F(r_noac["Th_a"][i]), T_air_east=F(r_east["Th_a"][i]), T_air_east0=F(r_east0["Th_a"][i]),
                         T_air_blinds=F(Ta_bl[i]),
                         T_floor_blinds=F(T_floor_bl[i]), T_air_nocourt=F(Ta[i] - r["Th_a_court"][i]),
                         T_air_lump=F(Ta_lump[i]),
